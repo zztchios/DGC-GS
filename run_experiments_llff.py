@@ -1,0 +1,151 @@
+import os
+import configparser
+import json
+import statistics
+from argparse import ArgumentParser
+
+
+def copy_configs(default_config, configs_path, cnt):
+    for i in range(1, cnt+1):
+        os.system(f"cp {default_config} {configs_path}/config_{i}.ini")
+
+def creat_configs(default_config, params, configs_path):
+    config = configparser.ConfigParser()
+
+    config_index = 0
+    for param, value in params.items():
+        for v in value:
+            config.read(default_config)
+            config_index += 1
+            config.set("default", param, str(v))
+            # print(config)
+            config.write(open(os.path.join(configs_path, f"config-{param}-{v}.ini"), "w+"))
+
+def run_experiments_llff(args, models_path, configs_path):
+    print("Running llff experiments...")
+    for config_name in os.listdir(configs_path):
+        print(f"Running llff experiments with config {config_name}")
+        config_path = os.path.join(configs_path, config_name)
+        for scan in args.scans:
+            model_path = os.path.join(models_path, config_name.split(".")[0], scan)
+            os.makedirs(model_path, exist_ok=True)
+            # os.system(f"cp {config_path} {model_path}/")
+            for i in range(1,args.count+1):
+                print(f"Running experiments with config {config_name} {i}")
+                os.system(f"bash scripts/run_llff.sh {args.data_path}/{scan} {model_path}/{i} {args.device} {config_path} {args.iter}")
+        print(f"Run llff experiments with config {config_name} DONE")
+
+def get_results(args, models_path):
+    print(f"Getting llff results...")
+    result_file = os.path.join(models_path, "result.json")
+    for config_dir in os.listdir(models_path):
+        if config_dir == "result.json":
+            continue
+        get_config_results(args, os.path.join(models_path, config_dir), result_file)
+    print(f"Get llff results DONE, written to {result_file}")
+
+
+def get_config_results(args, config_path, result_file):
+    config_dir = os.path.basename(config_path)
+    print(f"Getting config {config_dir} results...")
+
+    metrics = [[[f"{scan}"] for scan in args.scans] for _ in range(len(args.names))]
+    metrics = {}
+    for name in args.names:
+        metrics[name] = {}
+        for scan in args.scans:
+            metrics[name][scan] = []
+
+    for i, scan_dir in enumerate(os.listdir(config_path)):
+        for count_dir in os.listdir(os.path.join(config_path, scan_dir)):
+            result = os.path.join(config_path, scan_dir, count_dir, "results_eval.json")
+            if os.path.exists(result):
+                print(result)
+                with open(result, "r") as f:
+                    data = json.load(f)
+                metric = data[f"ours_{args.iter}"]
+                for j,name in enumerate(args.names):
+                    metrics[name][scan_dir].append(metric[name])
+    print(metrics)
+    out = {}
+    if os.path.exists(result_file):
+        with open(result_file, "r") as f:
+            out = json.load(f)
+
+    out[config_dir] = {f"{scan}":{} for scan in args.scans}
+    out[config_dir]["all_scan"] = {}
+
+    scan_max_idx = {}
+    for scan, scan_metric in metrics["PSNR"].items():
+        idx = -1
+        if scan_metric:
+            idx = scan_metric.index(max(scan_metric))
+        scan_max_idx[scan] = idx
+
+    scan_max_metric = {name: [] for name in args.names}
+    for i,name in enumerate(args.names):
+        mean = []
+        for scan,scan_metric in metrics[name].items():
+            mean += scan_metric
+            scan_count = len(scan_metric)
+            if scan_count > 0:
+                if scan_count > 1:
+                    scan_mean = statistics.mean(scan_metric)
+                    scan_variance = statistics.variance(scan_metric)
+                else:
+                    scan_mean = scan_metric[0]
+                    scan_variance = 0
+
+                scan_max = scan_metric[scan_max_idx[scan]]
+                out[config_dir][scan][f"{name}_mean"] = scan_mean
+                out[config_dir][scan][f"{name}_variance"] = scan_variance
+                out[config_dir][scan][f"count"] = scan_count
+                out[config_dir][scan][f"{name}_max"] = scan_max
+                scan_max_metric[name].append(scan_max)
+        all_count = len(mean)
+        if all_count > 0:
+            if all_count > 1:
+                all_max_mean = statistics.mean(scan_max_metric[name])
+                all_mean = statistics.mean(mean)
+                all_variance = statistics.variance(mean)
+            else:
+                all_max_mean = scan_max_metric[name][0]
+                all_mean = mean[0]
+                all_variance = 0
+    
+            out[config_dir]["all_scan"][f"{name}_max_mean"] = all_max_mean
+            out[config_dir]["all_scan"][f"{name}_mean"] = all_mean
+            out[config_dir]["all_scan"][f"{name}_variance"] = all_variance
+            out[config_dir]["all_scan"][f"count"] = all_count
+    
+    with open(result_file, "w") as f:
+        json.dump(out, f)
+    print(f"Get config {config_dir} results DONE.")
+
+
+if __name__ == "__main__":
+
+    parser = ArgumentParser()
+    
+    parser.add_argument('--scans', nargs="+", type=str, default=[
+                                                           "fortress", 
+                                                           "room"
+                                                           ])
+    parser.add_argument('--count', '-c', type=int, default=3)
+    parser.add_argument('--data_path', '-d', type=str, default="data/LLFF_new")
+    parser.add_argument('--output_path', '-o', type=str, default="test")
+    parser.add_argument('--names', nargs="+", type=str, default=["PSNR", "SSIM", "SSIM_sk", "LPIPS"])
+    parser.add_argument('--device', type=int, default=0)
+    parser.add_argument('--iter', type=int, default=6000)
+    parser.add_argument('--configs_path', type=str, default="config")
+
+    args = parser.parse_args()
+
+    models_path = os.path.join(args.output_path, "models")
+    os.makedirs(models_path, exist_ok=True)
+    configs_path = os.path.join(args.output_path, "configs")
+    os.makedirs(configs_path, exist_ok=True)
+    os.system(f"cp -a {args.configs_path}/* {configs_path}/")
+
+    run_experiments_llff(args, models_path, configs_path)
+    get_results(args, models_path)
