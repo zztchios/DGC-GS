@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# DGC-GS-Enhancing-Geometric-Consistency-in-Sparse-View-3D-Gaussian-Splatting
-=======
 # DGC-GS: Enhancing Geometric Consistency in Sparse-View 3D Gaussian Splatting
 
 This is the official repository for paper **DGC-GS: Enhancing Geometric Consistency in Sparse-View 3D Gaussian Splatting**.
@@ -147,4 +144,3 @@ Similar to Gaussian Splatting, our method can read standard COLMAP format datase
 ## Acknowledgement
 
 This code is developed on [DNGaussian](https://github.com/Fictionarry/DNGaussian) with [simple-knn](https://gitlab.inria.fr/bkerbl/simple-knn) and a modified [diff-gaussian-rasterization](https://github.com/ashawkey/diff-gaussian-rasterization). The implementation of neural renderer are based on [torch-ngp](https://github.com/ashawkey/torch-ngp). Codes about [DPT](https://github.com/DepthAnything/Depth-Anything-V2) are partial from [SparseNeRF](https://github.com/Wanggcong/SparseNeRF). Thanks for these great projects!
->>>>>>> 2311fae (first commit)
