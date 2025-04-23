@@ -1,0 +1,21 @@
+1.创建实验配置文件
+$ bash scripts/creat_experiments.sh [实验配置路径] [配置数]
+
+2.在 实验配置路径下 手动更改配置文件内配置参数
+
+3.运行实验
+$ bash scripts/run_experiments.sh [实验配置路径] [结果输出路径] [每种配置运行次数] [cuda序号] [迭代次数iter]
+
+4.实验结果
+[结果输出路径] 下 json文件
+
+example:
+$ bash scripts/creat_experiments.sh experiments_config/1 5
+$ bash scripts/run_experiments.sh experiments_config/1 experiments_test/1 3 0 6000
+
+
+单独运行一次测试
+$ bash scripts/run_dtu.sh [源数据路径] [输出路径] [cuda序号] [scan40] [ini配置路径] [迭代次数iter]
+
+example:
+$ bash scripts/run_dtu.sh data/dtu/scan40 output/test/0 0 scan40 config/test.ini 6000
